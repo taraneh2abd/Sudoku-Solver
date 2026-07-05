@@ -3,4 +3,5 @@ venv/
 data/
 data/*
 *.pyc
-
+results/
+results/*
