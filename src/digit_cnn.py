@@ -32,3 +32,4 @@ class SudokuDigitCNN(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.classifier(self.features(x))
+

@@ -258,3 +258,9 @@ Full Image
 * `Hough Transform` (در صورتی که Contour موفق نباشد)
 
 بنابراین عملیات تکراری روی **یک تصویر یکسان** انجام نمی‌شود؛ بلکه همان الگوریتم روی نسخه‌ای متفاوت از تصویر اجرا می‌شود تا احتمال موفقیت افزایش یابد.
+
+
+
+```bash
+python -m src.train --data-dir data/processed/digits --epochs 5 --output models/digit_cnn.pt
+```

@@ -5,11 +5,11 @@ python main.py C:\\Users\\T.Abdellahi\\Desktop\\term8\\vision\\proj\\FINAL\\Sudo
 import sys
 import cv2
 
+from src.digit_recognizer import DigitRecognizer
 from src.preprocess import preprocess
 from src.grid_extraction import extract, GridNotFoundError
 from src.cell_extraction import save_cells
 
-from src.digit_model_rec import DigitRecognizer
 from src.solve_sudoku import solve
 
 
