@@ -41,14 +41,14 @@ def save_cells(warped, output_dir):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     cells = [
-        _make_raw_cell(warped, row, col)
+        make_raw_cell(warped, row, col)
         for row in range(9)
         for col in range(9)
     ]
 
     for cell in cells:
         if not cell.is_empty:
-            cell.image = _process_cell(cell.image)
+            cell.image = process_cell(cell.image)
 
     cells_dir = out_dir / "cells"
     cells_dir.mkdir(exist_ok=True)
@@ -64,7 +64,7 @@ def save_cells(warped, output_dir):
     return cells
 
 
-def _make_raw_cell(warped, row, col) -> Cell:
+def make_raw_cell(warped, row, col) -> Cell:
     """خونه را از تصویر خاکستری خام برش می‌زند و خالی/پر بودنش را با یک چک ساده تشخیص می‌دهد."""
 
     y0, y1 = row * CELL_SIZE, (row + 1) * CELL_SIZE
@@ -83,7 +83,7 @@ def _make_raw_cell(warped, row, col) -> Cell:
     return Cell(crop, is_empty)
 
 
-def _process_cell(crop) -> np.ndarray:
+def process_cell(crop) -> np.ndarray:
     _, binary = cv2.threshold(
         crop,
         0,
@@ -132,10 +132,10 @@ def _process_cell(crop) -> np.ndarray:
 
     binary = cv2.bitwise_and(binary, cv2.bitwise_not(remove_mask))
 
-    return _clean_noise(binary)
+    return clean_noise(binary)
 
 
-def _clean_noise(cell_image) -> np.ndarray:
+def clean_noise(cell_image) -> np.ndarray:
     count, labels, stats, _ = cv2.connectedComponentsWithStats(
         cell_image,
         connectivity=8,

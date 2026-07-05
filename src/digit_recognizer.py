@@ -6,11 +6,11 @@ import cv2
 import torch
 from torchvision import transforms
 
-from src.digit_cnn import SudokuDigitCNN
+from src.digit_model import SudokuDigitCNN
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-MODEL_PATH = Path("models/digit_cnn.pt")
+MODEL_PATH = Path("models/old_black_white_ds.pt")
 
 transform = transforms.Compose([
     transforms.ToPILImage(),

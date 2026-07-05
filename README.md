@@ -260,8 +260,15 @@ Full Image
 بنابراین عملیات تکراری روی **یک تصویر یکسان** انجام نمی‌شود؛ بلکه همان الگوریتم روی نسخه‌ای متفاوت از تصویر اجرا می‌شود تا احتمال موفقیت افزایش یابد.
 
 
+# دیتاست های ما
+https://huggingface.co/datasets/Lexski/sudoku-image-recognition/blob/main/README.md?code=true&utm_source=chatgpt.com
+
 
 ```bash
-python -m src.train --data-dir data/processed/digits --epochs 5 --output models/digit_cnn.pt
-python main.py C:\\Users\\T.Abdellahi\\Desktop\\term8\\vision\\proj\\FINAL\\Sudoku-Solver\\data\\bad-sodu\\00083_shadow_sp_shadow_rot.jpg  
+python -m src.train --data-dir data/processed/digits --epochs 5 --output models/new_ds.pt
+python main.py C:\\Users\\T.Abdellahi\\Desktop\\term8\\vision\\proj\\FINAL\\Sudoku-Solver\\data\\train\\00026.jpg  
 ```
+
+چیزهایی که داخل پایپلاین نیست و یک بار باید ران بشه دستی:
+جنریت دیتاست
+ترین  
