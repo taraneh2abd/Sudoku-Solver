@@ -1,7 +1,3 @@
-"""
-Usage:
-python main.py C:\\Users\\T.Abdellahi\\Desktop\\term8\\vision\\proj\\FINAL\\Sudoku-Solver\\data\\test\\00000.jpg accuracy low--output results
-"""
 import sys
 import cv2
 
@@ -11,10 +7,18 @@ from src.grid_extraction import extract, GridNotFoundError
 from src.cell_extraction import save_cells
 
 from src.solve_sudoku import solve
-
+import shutil
+from pathlib import Path
 
 OUTPUT_DIR = "results"
 
+def prepare_output_dir(output_dir: str):
+    output_dir = Path(output_dir)
+
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
 
 def print_board(board, title):
 
@@ -26,6 +30,7 @@ def print_board(board, title):
 
 
 def main():
+    prepare_output_dir(OUTPUT_DIR)
 
     if len(sys.argv) != 2:
         print("Usage:")
