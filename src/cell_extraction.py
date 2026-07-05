@@ -150,8 +150,8 @@ def _clean_noise(cell_image) -> np.ndarray:
     return cleaned
 
 
-# img = cv2.imread("cell.png", cv2.IMREAD_GRAYSCALE)
+# img = cv2.imread("tests/cell.png", cv2.IMREAD_GRAYSCALE)
 
 # result = _process_cell(img)
 
-# cv2.imwrite("result.png", result)
+# cv2.imwrite("tests/result.png", result)
