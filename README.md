@@ -263,5 +263,5 @@ Full Image
 
 ```bash
 python -m src.train --data-dir data/processed/digits --epochs 5 --output models/digit_cnn.pt
-python main.py C:\\Users\\T.Abdellahi\\Desktop\\term8\\vision\\proj\\FINAL\\Sudoku-Solver\\data\\train\\00002.jpg  
+python main.py C:\\Users\\T.Abdellahi\\Desktop\\term8\\vision\\proj\\FINAL\\Sudoku-Solver\\data\\bad-sodu\\00083_shadow_sp_shadow_rot.jpg  
 ```
