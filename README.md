@@ -263,4 +263,5 @@ Full Image
 
 ```bash
 python -m src.train --data-dir data/processed/digits --epochs 5 --output models/digit_cnn.pt
+python main.py C:\\Users\\T.Abdellahi\\Desktop\\term8\\vision\\proj\\FINAL\\Sudoku-Solver\\data\\train\\00002.jpg  
 ```

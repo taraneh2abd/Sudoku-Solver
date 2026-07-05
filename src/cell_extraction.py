@@ -8,11 +8,15 @@ import numpy as np
 
 from .grid_extraction import WARP_SIZE
 
+# CELL_SIZE = 450 // 9
+
 CELL_SIZE = WARP_SIZE // 9
 CELL_MARGIN_RATIO = 0.12
 
 WHITE_RATIO_FOR_INVERSE = 0.55
 MIN_NOISE_AREA = 15
+
+EDGE_RATIO = 0.20
 
 
 @dataclass
@@ -28,10 +32,10 @@ def save_cells(warped, output_dir):
     ترتیب دقیق کار:
       1) ابتدا هر ۸۱ خونه از تصویر خام برش زده و در cells ریخته می‌شود.
          خونه‌های خالی همینجا مشخص و بدون پردازش رها می‌شوند.
-      2) هر خونه‌ی غیرخالی باینری (۰ و ۱ / سیاه و سفید) می‌شود.
+      2) هر خونه‌ی غیرخالی باینری (۰ و ۲۵۵) می‌شود.
       3) اگر بیش از ۵۵٪ پیکسل‌های آن سفید باشند، اینورس می‌شود.
-      4) خطوط عمودی و افقی با یک کرنل مناسب داخل همان خونه حذف می‌شوند.
-      5) فقط بزرگ‌ترین کامپوننت‌های متصل نگه داشته می‌شوند و نویز حذف می‌شود.
+      4) فقط خطوط افقی و عمودی نزدیک لبه‌های سلول حذف می‌شوند.
+      5) فقط کامپوننت‌های متصل بزرگ نگه داشته شده و نویز حذف می‌شود.
     """
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -48,6 +52,7 @@ def save_cells(warped, output_dir):
 
     cells_dir = out_dir / "cells"
     cells_dir.mkdir(exist_ok=True)
+
     for index, cell in enumerate(cells):
         if not cell.is_empty:
             row, col = divmod(index, 9)
@@ -61,11 +66,15 @@ def save_cells(warped, output_dir):
 
 def _make_raw_cell(warped, row, col) -> Cell:
     """خونه را از تصویر خاکستری خام برش می‌زند و خالی/پر بودنش را با یک چک ساده تشخیص می‌دهد."""
+
     y0, y1 = row * CELL_SIZE, (row + 1) * CELL_SIZE
     x0, x1 = col * CELL_SIZE, (col + 1) * CELL_SIZE
 
-    y0, y1 = y0 + int((y1 - y0) * CELL_MARGIN_RATIO), y1 - int((y1 - y0) * CELL_MARGIN_RATIO)
-    x0, x1 = x0 + int((x1 - x0) * CELL_MARGIN_RATIO), x1 - int((x1 - x0) * CELL_MARGIN_RATIO)
+    y0 = y0 + int((y1 - y0) * CELL_MARGIN_RATIO)
+    y1 = y1 - int((y1 - y0) * CELL_MARGIN_RATIO)
+
+    x0 = x0 + int((x1 - x0) * CELL_MARGIN_RATIO)
+    x1 = x1 - int((x1 - x0) * CELL_MARGIN_RATIO)
 
     crop = warped[y0:y1, x0:x1]
 
@@ -75,29 +84,74 @@ def _make_raw_cell(warped, row, col) -> Cell:
 
 
 def _process_cell(crop) -> np.ndarray:
-    _, binary = cv2.threshold(crop, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    _, binary = cv2.threshold(
+        crop,
+        0,
+        255,
+        cv2.THRESH_BINARY | cv2.THRESH_OTSU,
+    )
 
     white_ratio = cv2.countNonZero(binary) / binary.size
     if white_ratio > WHITE_RATIO_FOR_INVERSE:
         binary = cv2.bitwise_not(binary)
 
     h, w = binary.shape
-    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (max(1, int(w * 0.8)), 1))
-    vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, max(1, int(h * 0.8))))
-    horizontal_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, horizontal_kernel)
-    vertical_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, vertical_kernel)
-    lines = cv2.bitwise_or(horizontal_lines, vertical_lines)
-    binary = cv2.bitwise_and(binary, cv2.bitwise_not(lines))
+
+    # ماسک خطوطی که باید حذف شوند
+    remove_mask = np.zeros_like(binary)
+
+    # پیدا کردن خطوط
+    lines = cv2.HoughLinesP(
+        binary,
+        rho=1,
+        theta=np.pi / 180,
+        threshold=15,
+        minLineLength=min(h, w) // 3,
+        maxLineGap=3,
+    )
+
+    if lines is not None:
+        margin_x = int(w * EDGE_RATIO)
+        margin_y = int(h * EDGE_RATIO)
+
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+
+            dx = abs(x2 - x1)
+            dy = abs(y2 - y1)
+
+            if dx <= 2:
+                x = (x1 + x2) // 2
+                if x <= margin_x or x >= w - margin_x:
+                    cv2.line(remove_mask, (x1, y1), (x2, y2), 255, 3)
+
+            elif dy <= 2:
+                y = (y1 + y2) // 2
+                if y <= margin_y or y >= h - margin_y:
+                    cv2.line(remove_mask, (x1, y1), (x2, y2), 255, 3)
+
+    binary = cv2.bitwise_and(binary, cv2.bitwise_not(remove_mask))
 
     return _clean_noise(binary)
 
 
 def _clean_noise(cell_image) -> np.ndarray:
-    count, labels, stats, _ = cv2.connectedComponentsWithStats(cell_image, connectivity=8)
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(
+        cell_image,
+        connectivity=8,
+    )
 
     cleaned = np.zeros_like(cell_image)
+
     for label in range(1, count):
         if stats[label, cv2.CC_STAT_AREA] >= MIN_NOISE_AREA:
             cleaned[labels == label] = 255
 
     return cleaned
+
+
+# img = cv2.imread("cell.png", cv2.IMREAD_GRAYSCALE)
+
+# result = _process_cell(img)
+
+# cv2.imwrite("result.png", result)
