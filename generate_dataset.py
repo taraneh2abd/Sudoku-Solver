@@ -93,7 +93,17 @@ def cell_label(flags: list[int]) -> int | None:
 
     solved = int(flags[0]) == 1
 
+    # خانه خالی
     if not solved:
+        digits = [
+            i
+            for i, value in enumerate(flags[1:], start=1)
+            if int(value) == 1
+        ]
+
+        if len(digits) == 0:
+            return 0
+
         return None
 
     digits = [
@@ -111,15 +121,15 @@ def cell_label(flags: list[int]) -> int | None:
 def prepare_dirs(root: Path):
 
     for split in ["train", "val", "test"]:
-        for label in range(1, 10):
+        for label in range(10):      # 0 تا 9
             ensure_dir(root / split / str(label))
-
-
+            
 def generate_split(dataset_split, split, output_dir, max_items):
 
     split = split_name(split)
 
-    counts = {str(i): 0 for i in range(1, 10)}
+    # counts = {str(i): 0 for i in range(1, 10)}
+    counts = {str(i): 0 for i in range(10)}
 
     limit = len(dataset_split)
 
@@ -153,9 +163,6 @@ def generate_split(dataset_split, split, output_dir, max_items):
                     row,
                     col,
                 )
-
-                if cell.is_empty:
-                    continue
 
                 processed = process_cell(
                     cell.image
