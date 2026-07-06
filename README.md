@@ -267,8 +267,30 @@ https://huggingface.co/datasets/Lexski/sudoku-image-recognition/blob/main/README
 ```bash
 python -m src.train --data-dir data/processed/digits --epochs 10 --output models/new_ds_10_epoch.pt
 python main.py C:\\Users\\T.Abdellahi\\Desktop\\term8\\vision\\proj\\FINAL\\Sudoku-Solver\\data\\train\\00026.jpg  
+python app.py
 ```
 
 چیزهایی که داخل پایپلاین نیست و یک بار باید ران بشه دستی:
 جنریت دیتاست
 ترین  
+
+
+الان اپ فقط وابسته ست به فایلای جیسون، وگرنه دیگه هیچ کاپلینگی نداره. فقط جیسون رو درست بده و اپ کار میکنه
+"UNSOLVABLE"
+یا
+یک ارایه دوبعدی
+
+
+
+مدل رو اگه خواستی عوض کنی باید اینا عوض:
+مین
+دیجیت مدل
+دیجیت ریکگنایزر
+ترین
+
+
+جنریت دیتاست ممکنه بدردت نخوره دیگه
+یوتیلز ممکنه دیگه به درد نخوره
+
+
+مدل حل سودوکو بعضی وقتا نمیفهمه غیرقابل حله. درستش کن

@@ -83,6 +83,7 @@
 
 # main.py - نسخه کامل با تعریف LeNet
 import sys
+import json
 import cv2
 import torch
 import torch.nn as nn
@@ -95,6 +96,7 @@ from src.cell_extraction import save_cells
 from src.solve_sudoku import solve
 import shutil
 from pathlib import Path
+import os
 
 # ==================== تعریف کلاس LeNet در main.py ====================
 class LeNet(nn.Module):
@@ -126,11 +128,18 @@ def prepare_output_dir(output_dir: str):
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-def print_board(board, title):
+def print_board(board, title, json_path=None):
     print("\n" + title)
     print("-" * 30)
+
     for row in board:
         print(" ".join(str(x) for x in row))
+
+    if json_path:
+        os.makedirs(os.path.dirname(json_path), exist_ok=True)
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(board, f, indent=4)
 
 def main():
     prepare_output_dir(OUTPUT_DIR)
@@ -163,14 +172,27 @@ def main():
     recognizer = DigitRecognizer()
     board = recognizer.predict_board(cells)
 
-    print_board(board, "Detected Sudoku")
+    print_board(
+        board,
+        "Detected Sudoku",
+        "results/00_original.json"
+    )
 
     solved = [row[:] for row in board]
 
     if solve(solved):
-        print_board(solved, "Solved Sudoku")
+
+        print_board(
+            solved,
+            "Solved Sudoku",
+            "results/00_solved.json"
+        )
+
     else:
+
         print("\nNo solution found.")
 
+        with open("results/00_solved.json", "w", encoding="utf-8") as f:
+            json.dump("UNSOLVABLE", f)
 if __name__ == "__main__":
     main()

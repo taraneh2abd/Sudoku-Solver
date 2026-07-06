@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Sudoku Solver</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Sudoku Solver</h1>
+
+    <label class="upload">
+
+        <input type="file" id="imageInput" accept="image/*">
+
+        انتخاب تصویر
+
+    </label>
+
+    <button id="solveBtn">Solve</button>
+
+    <div id="previewArea">
+
+        <img id="preview">
+
+    </div>
+
+    <div id="boards">
+
+        <div>
+
+            <h2>Detected Sudoku</h2>
+
+            <div id="originalBoard"></div>
+
+        </div>
+
+        <div>
+
+            <h2>Solution</h2>
+
+            <div id="solvedBoard"></div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+
+</html>
