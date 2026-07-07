@@ -266,7 +266,7 @@ https://huggingface.co/datasets/Lexski/sudoku-image-recognition/blob/main/README
 
 ```bash
 python -m src.train --data-dir data/processed/digits --epochs 10 --output models/new_ds_10_epoch.pt
-python main.py C:\\Users\\T.Abdellahi\\Desktop\\term8\\vision\\proj\\FINAL\\Sudoku-Solver\\data\\train\\00026.jpg  
+python main.py C:\\Users\\T.Abdellahi\\Desktop\\term8\\vision\\proj\\FINAL\\Sudoku-Solver\\data\\train\\00012.jpg  
 python app.py
 ```
 
