@@ -93,7 +93,7 @@ from src.digit_recognizer import DigitRecognizer
 from src.preprocess import preprocess
 from src.grid_extraction import extract, GridNotFoundError
 from src.cell_extraction import save_cells
-from src.solve_sudoku import solve
+from src.solve_sudoku import solve, board_has_conflicts
 import shutil
 from pathlib import Path
 import os
@@ -142,14 +142,18 @@ def print_board(board, title, json_path=None):
             json.dump(board, f, indent=4)
 
 def main():
-    prepare_output_dir(OUTPUT_DIR)
-
-    if len(sys.argv) != 2:
+    if len(sys.argv) not in (2, 3):
         print("Usage:")
-        print("python main.py image.jpg")
+        print("python main.py image.jpg [output_dir]")
         return
 
     image_path = sys.argv[1]
+    # output_dir is optional so a caller (e.g. app.py) can give each request
+    # its own directory instead of everyone sharing/overwriting "results/"
+    output_dir = sys.argv[2] if len(sys.argv) == 3 else OUTPUT_DIR
+
+    prepare_output_dir(output_dir)
+
     image = cv2.imread(image_path)
 
     if image is None:
@@ -157,17 +161,17 @@ def main():
 
     print(f"Input : {image_path}")
 
-    pre = preprocess(image, OUTPUT_DIR)
+    pre = preprocess(image, output_dir)
 
     try:
-        corners, warped, _ = extract(pre, image, OUTPUT_DIR)
+        corners, warped, _ = extract(pre, image, output_dir)
     except GridNotFoundError:
         print("Grid not found")
         return
 
-    cv2.imwrite(f"{OUTPUT_DIR}/final_warped.jpg", warped)
+    cv2.imwrite(f"{output_dir}/final_warped.jpg", warped)
 
-    cells = save_cells(warped, OUTPUT_DIR)
+    cells = save_cells(warped, output_dir)
 
     recognizer = DigitRecognizer()
     board = recognizer.predict_board(cells)
@@ -175,24 +179,35 @@ def main():
     print_board(
         board,
         "Detected Sudoku",
-        "results/00_original.json"
+        f"{output_dir}/00_original.json"
     )
 
     solved = [row[:] for row in board]
 
-    if solve(solved):
+    if board_has_conflicts(board):
+        # The detected givens already break a row/column/box rule on their
+        # own - a correct backtracking search would exhaustively fail on
+        # this too, but reporting it as "UNSOLVABLE" would be misleading:
+        # it's much more likely the digit recognizer misread a cell than
+        # that the photographed puzzle itself is invalid.
+        print("\nDetected digits conflict with Sudoku rules (likely a misread digit).")
+
+        with open(f"{output_dir}/00_solved.json", "w", encoding="utf-8") as f:
+            json.dump("INVALID_BOARD", f)
+
+    elif solve(solved):
 
         print_board(
             solved,
             "Solved Sudoku",
-            "results/00_solved.json"
+            f"{output_dir}/00_solved.json"
         )
 
     else:
 
         print("\nNo solution found.")
 
-        with open("results/00_solved.json", "w", encoding="utf-8") as f:
+        with open(f"{output_dir}/00_solved.json", "w", encoding="utf-8") as f:
             json.dump("UNSOLVABLE", f)
 if __name__ == "__main__":
     main()

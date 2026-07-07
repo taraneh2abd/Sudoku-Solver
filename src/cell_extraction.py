@@ -16,7 +16,8 @@ CELL_MARGIN_RATIO = 0.12
 WHITE_RATIO_FOR_INVERSE = 0.55
 MIN_NOISE_AREA = 15
 
-EDGE_RATIO = 0.0
+EDGE_RATIO = 0.15
+MAX_DIGIT_COMPONENTS = 1
 
 
 @dataclass
@@ -36,6 +37,9 @@ def save_cells(warped, output_dir):
       3) اگر بیش از ۵۵٪ پیکسل‌های آن سفید باشند، اینورس می‌شود.
       4) فقط خطوط افقی و عمودی نزدیک لبه‌های سلول حذف می‌شوند.
       5) فقط کامپوننت‌های متصل بزرگ نگه داشته شده و نویز حذف می‌شود.
+      6) اگر بیش از یک کامپوننت (رقم) باقی بماند، یعنی خونه چند رقم کاندید
+         (پنسیل‌مارک) دارد نه یک جواب قطعی؛ در این حالت خونه خالی در نظر
+         گرفته می‌شود.
     """
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -48,7 +52,14 @@ def save_cells(warped, output_dir):
 
     for cell in cells:
         if not cell.is_empty:
-            cell.image = process_cell(cell.image)
+            cleaned, kept = process_cell(cell.image)
+            if kept > MAX_DIGIT_COMPONENTS:
+                # more than one digit-shaped blob survived -> this is a
+                # multi-candidate (pencil-mark) cell, not a single solved
+                # digit, so treat it the same as a genuinely empty cell.
+                cell.is_empty = True
+            else:
+                cell.image = cleaned
 
     cells_dir = out_dir / "cells"
     cells_dir.mkdir(exist_ok=True)
@@ -70,11 +81,15 @@ def make_raw_cell(warped, row, col) -> Cell:
     y0, y1 = row * CELL_SIZE, (row + 1) * CELL_SIZE
     x0, x1 = col * CELL_SIZE, (col + 1) * CELL_SIZE
 
-    y0 = y0 + int((y1 - y0) * CELL_MARGIN_RATIO)
-    y1 = y1 - int((y1 - y0) * CELL_MARGIN_RATIO)
+    # compute each margin once, from the original span, so the top/left and
+    # bottom/right margins stay symmetric (previously the second margin was
+    # computed from the already-shrunk span, trimming 1px less on the
+    # bottom/right than on the top/left of every cell)
+    margin_y = int((y1 - y0) * CELL_MARGIN_RATIO)
+    margin_x = int((x1 - x0) * CELL_MARGIN_RATIO)
 
-    x0 = x0 + int((x1 - x0) * CELL_MARGIN_RATIO)
-    x1 = x1 - int((x1 - x0) * CELL_MARGIN_RATIO)
+    y0, y1 = y0 + margin_y, y1 - margin_y
+    x0, x1 = x0 + margin_x, x1 - margin_x
 
     crop = warped[y0:y1, x0:x1]
 
@@ -83,7 +98,7 @@ def make_raw_cell(warped, row, col) -> Cell:
     return Cell(crop, is_empty)
 
 
-def process_cell(crop) -> np.ndarray:
+def process_cell(crop) -> tuple[np.ndarray, int]:
     _, binary = cv2.threshold(
         crop,
         0,
@@ -135,19 +150,23 @@ def process_cell(crop) -> np.ndarray:
     return clean_noise(binary)
 
 
-def clean_noise(cell_image) -> np.ndarray:
+def clean_noise(cell_image) -> tuple[np.ndarray, int]:
+    """نویز را حذف می‌کند و تعداد کامپوننت‌های (بلاب‌های) باقی‌مانده را هم برمی‌گرداند
+    تا صدا‌زننده بتواند خونه‌هایی با چند رقم کاندید (پنسیل‌مارک) را به‌عنوان خالی علامت بزند."""
     count, labels, stats, _ = cv2.connectedComponentsWithStats(
         cell_image,
         connectivity=8,
     )
 
     cleaned = np.zeros_like(cell_image)
+    kept = 0
 
     for label in range(1, count):
         if stats[label, cv2.CC_STAT_AREA] >= MIN_NOISE_AREA:
             cleaned[labels == label] = 255
+            kept += 1
 
-    return cleaned
+    return cleaned, kept
 
 
 # img = cv2.imread("tests/cell.png", cv2.IMREAD_GRAYSCALE)

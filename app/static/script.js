@@ -33,6 +33,13 @@ document.getElementById("solveBtn").onclick = async () => {
             ❌ This Sudoku is unsolvable
         </div>`;
 
+    } else if (data.solved === "INVALID_BOARD") {
+
+        document.getElementById("solvedBoard").innerHTML =
+            `<div class="unsolved">
+            ⚠️ Detected digits conflict with Sudoku rules — likely a misread digit. Try a clearer photo.
+        </div>`;
+
     } else {
 
         drawBoard(data.solved, "solvedBoard", true);
