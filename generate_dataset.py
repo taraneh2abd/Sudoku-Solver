@@ -164,7 +164,7 @@ def generate_split(dataset_split, split, output_dir, max_items):
                     col,
                 )
 
-                processed, _kept = process_cell(
+                processed = process_cell(
                     cell.image
                 )
 

@@ -24,18 +24,13 @@ def extract(pre, image, output_dir=None):
            original single-file extract_grid()).
 
     Three-stage detection, in priority order:
-      1) PRIMARY  - our original method: median-blur(5) + gaussian-blur +
+      1) PRIMARY  - our original method: median-blur + gaussian-blur +
          adaptive threshold on the (possibly downsampled) detect image,
          contour search with a Hough-line fallback. Unchanged from before.
       2) FALLBACK - only runs if (1) found nothing. Redoes the same
-         contour+Hough search (_locate_grid) but on a fresh, full-resolution
-         version of the image with a lighter median-blur(3) instead of no
-         median blur at all: a strong median-blur(5) can erase thin printed
-         grid lines on a clean image, but dropping it completely leaves
-         salt-and-pepper noise untouched (median blur is the filter that
-         actually fights that noise type), so the fallback uses a smaller
-         kernel as a middle ground - still meaningfully different from
-         PRIMARY, but not counter-productive on noisy photos.
+         contour+Hough search (_locate_grid) but on a fresh, full-resolution,
+         NO-median-blur version of the image (matches the alternate
+         "low accuracy" implementation).
       3) LAST RESORT - only if both (1) and (2) found nothing: treat the
          whole image as the grid instead of failing outright.
     """
@@ -51,10 +46,10 @@ def extract(pre, image, output_dir=None):
     if corners is not None and pre.detect_scale < 1.0:
         corners = corners / pre.detect_scale
 
-    # ---------- 2) FALLBACK (light median blur, full resolution) ----------
+    # ---------- 2) FALLBACK (no median blur, full resolution) ----------
     if corners is None:
-        print("[grid] primary method found nothing -> trying fallback (light median blur, full resolution)")
-        fb_blurred = cv2.GaussianBlur(cv2.medianBlur(pre.normalized, 3), (5, 5), 0)
+        print("[grid] primary method found nothing -> trying fallback (no median blur, full resolution)")
+        fb_blurred = cv2.GaussianBlur(pre.normalized, (5, 5), 0)
         fb_binary = cv2.adaptiveThreshold(
             fb_blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
             cv2.THRESH_BINARY_INV, 11, 2,
@@ -196,19 +191,10 @@ def _locate_grid(binary, blurred) -> np.ndarray | None:
 
     return None, None
 
-def _auto_canny(image, sigma=0.33) -> np.ndarray:
-    """Canny thresholds derived from the image's own median intensity instead
-    of fixed constants, so contrast/lighting/noise differences between images
-    (shadows, low-contrast scans, salt-and-pepper noise) don't require
-    re-tuning a single fixed (50, 150) pair by hand."""
-    median = float(np.median(image))
-    lower = int(max(0, (1.0 - sigma) * median))
-    upper = int(min(255, (1.0 + sigma) * median))
-    return cv2.Canny(image, lower, upper)
-
-
 def _corners_from_hough(blurred, min_area) -> np.ndarray | None:
-    edges = _auto_canny(blurred)
+    print("herehereedfjkahfjhfhjdhfkakj")
+
+    edges = cv2.Canny(blurred, 50, 150)
     threshold = max(80, min(blurred.shape) // 4)
     lines = cv2.HoughLines(edges, 1, np.pi / 180, threshold)
 
@@ -261,27 +247,15 @@ def _intersect_lines(line_a, line_b) -> tuple[float, float] | None:
 
 
 def _order_corners(points) -> np.ndarray:
-    """Order 4 points as (tl, tr, br, bl).
-
-    The previous implementation picked each corner by min/max of x+y and
-    y-x, which is only guaranteed correct for rotations below ~45 degrees
-    (ties/mislabels near or past that boundary can pick two adjacent points
-    instead of two opposite ones, producing a self-intersecting "bowtie"
-    perspective warp). Sorting by angle around the quad's own centroid
-    instead gives a mathematically consistent tl/tr/br/bl cyclic order for
-    *any* rotation of a convex quadrilateral: in image coordinates (y down),
-    the top-left corner always falls in the (-180, -90) degree sector
-    relative to the centroid, top-right in (-90, 0), bottom-right in (0, 90),
-    and bottom-left in (90, 180) - regardless of how far the whole shape is
-    rotated - so ascending-angle order is exactly (tl, tr, br, bl).
-
-    This does not (and cannot, from geometry alone) recover which corner was
-    the *printed* top-left of the original puzzle after a 90/180/270 degree
-    rotation - only that the 4 points are taken in valid, non-self-
-    intersecting cyclic order, which is what the perspective warp needs to
-    avoid producing a twisted/flipped board.
-    """
-    points = np.asarray(points, dtype=np.float32).reshape(4, 2)
-    center = points.mean(axis=0)
-    angles = np.arctan2(points[:, 1] - center[1], points[:, 0] - center[0])
-    return points[np.argsort(angles)]
+    # 4 points as (tl, tr, br, bl) — invariant to rotations below 45 degrees
+    sums = points.sum(axis=1)
+    diffs = np.diff(points, axis=1).ravel()
+    return np.array(
+        [
+            points[sums.argmin()],   # top-left: smallest x + y
+            points[diffs.argmin()],  # top-right: smallest y - x
+            points[sums.argmax()],   # bottom-right: largest x + y
+            points[diffs.argmax()],  # bottom-left: largest y - x
+        ],
+        dtype=np.float32,
+    )

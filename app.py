@@ -1,7 +1,6 @@
 import os
 import json
 import time
-import uuid
 import subprocess
 
 from flask import Flask, render_template, request, jsonify
@@ -14,41 +13,19 @@ app = Flask(
 )
 
 UPLOAD_FOLDER = "app/uploads"
-RESULTS_ROOT = "results"
+
+ORIGINAL_JSON = "results/00_original.json"
+SOLVED_JSON = "results/00_solved.json"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(RESULTS_ROOT, exist_ok=True)
+os.makedirs("results", exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-
-UPLOAD_TIMEOUT_SECONDS = 30
 
 
 @app.route("/")
 def index():
     return render_template("index.html")
-
-
-def _wait_for_file(path, process, timeout):
-    """Poll for `path` to appear. Returns None on success, or an error
-    string if the wait timed out or the subprocess exited early without
-    producing the file (in which case we don't wait out the rest of the
-    timeout - the process is already gone, so surface its stderr instead)."""
-    start = time.time()
-
-    while not os.path.exists(path):
-        if process.poll() is not None:
-            _, stderr = process.communicate()
-            detail = stderr.strip() if stderr else f"exit code {process.returncode}"
-            return f"main.py failed before writing {os.path.basename(path)}: {detail}"
-
-        if time.time() - start > timeout:
-            process.kill()
-            return f"Timeout waiting for {os.path.basename(path)}"
-
-        time.sleep(0.2)
-
-    return None
 
 
 @app.route("/upload", methods=["POST"])
@@ -59,40 +36,44 @@ def upload():
 
     file = request.files["image"]
 
-    # every upload gets its own id: previously the upload filename and the
-    # results/*.json paths were fixed/global, so two concurrent uploads
-    # (two tabs, two users) would silently overwrite each other's files.
-    job_id = uuid.uuid4().hex
-    filename = f"{job_id}_{secure_filename(file.filename)}"
+    filename = secure_filename(file.filename)
     filepath = os.path.join(UPLOAD_FOLDER, filename)
+
     file.save(filepath)
 
-    output_dir = os.path.join(RESULTS_ROOT, job_id)
-    original_json = os.path.join(output_dir, "00_original.json")
-    solved_json = os.path.join(output_dir, "00_solved.json")
+    # حذف خروجی‌های قبلی
+    for f in [ORIGINAL_JSON, SOLVED_JSON]:
+        if os.path.exists(f):
+            os.remove(f)
 
+    # اجرای solver
     process = subprocess.Popen(
-        ["python", "main.py", filepath, output_dir],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
+        ["python", "main.py", filepath]
     )
 
-    # each wait gets its own fresh timeout budget (previously a single
-    # `start` timestamp was shared across both waits, so the true combined
-    # budget was 30s total instead of the apparent 30s-per-stage)
-    error = _wait_for_file(original_json, process, UPLOAD_TIMEOUT_SECONDS)
-    if error:
-        return jsonify({"error": error}), 500
+    # منتظر ساخت original
+    timeout = 30
+    start = time.time()
 
-    with open(original_json, encoding="utf-8") as f:
+    while not os.path.exists(ORIGINAL_JSON):
+        if time.time() - start > timeout:
+            process.kill()
+            return jsonify({"error": "Timeout waiting for original board"}), 500
+
+        time.sleep(0.2)
+
+    with open(ORIGINAL_JSON, encoding="utf-8") as f:
         original = json.load(f)
 
-    error = _wait_for_file(solved_json, process, UPLOAD_TIMEOUT_SECONDS)
-    if error:
-        return jsonify({"error": error}), 500
+    # منتظر solved
+    while not os.path.exists(SOLVED_JSON):
+        if time.time() - start > timeout:
+            process.kill()
+            return jsonify({"error": "Timeout waiting for solved board"}), 500
 
-    with open(solved_json, encoding="utf-8") as f:
+        time.sleep(0.2)
+
+    with open(SOLVED_JSON, encoding="utf-8") as f:
         solved = json.load(f)
 
     return jsonify({

@@ -5,11 +5,3 @@ data/*
 *.pyc
 results/
 results/*
-docs/*
-docs/
-.claude/*
-.claude/
-.claude
-claude/*
-claude/
-claude
