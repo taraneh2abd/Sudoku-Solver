@@ -1,7 +1,15 @@
 venv/
 .venv/
-data/
+data_mnist_lexski/bad-sodu
+data_mnist_lexski/MNIST
+data_mnist_lexski/processed
+data_mnist_lexski/test
+data_mnist_lexski/train
+data_mnist_lexski/val
 data/*
+data/
 *.pyc
 results/
 results/*
+data_mnist_manual_mix/mixed_dataset_final/
+data_mnist_manual_mix/mixed_dataset_final/*
