@@ -47,19 +47,18 @@ def main():
     print(f"Input : {image_path}")
 
     pre = preprocess(image, OUTPUT_DIR)
-
     try:
-        corners, warped, _ = extract(pre, image, OUTPUT_DIR)
+        corners, warped, warped_original, _ = extract(pre, image, OUTPUT_DIR)
 
     except GridNotFoundError:
-
         print("Grid not found")
         return
 
     cv2.imwrite(f"{OUTPUT_DIR}/final_warped.jpg", warped)
+    cv2.imwrite(f"{OUTPUT_DIR}/final_warped_original.jpg", warped_original)
 
-    cells = save_cells(warped, OUTPUT_DIR)
-
+    # پاس دادن هر دو تصویر به save_cells
+    cells = save_cells(warped, warped_original, OUTPUT_DIR)
     recognizer = DigitRecognizer()
 
     board = recognizer.predict_board(cells)

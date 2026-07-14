@@ -25,30 +25,31 @@ class Cell:
     is_empty: bool
 
 
-def save_cells(warped, output_dir):
+def save_cells(warped, warped_original, output_dir):
     """
-    warped: تصویر خاکستری وارپ‌شده‌ی گرید.
-
-    ترتیب دقیق کار:
-      1) ابتدا هر ۸۱ خونه از تصویر خام برش زده و در cells ریخته می‌شود.
-         خونه‌های خالی همینجا مشخص و بدون پردازش رها می‌شوند.
-      2) هر خونه‌ی غیرخالی باینری (۰ و ۲۵۵) می‌شود.
-      3) اگر بیش از ۵۵٪ پیکسل‌های آن سفید باشند، اینورس می‌شود.
-      4) فقط خطوط افقی و عمودی نزدیک لبه‌های سلول حذف می‌شوند.
-      5) فقط کامپوننت‌های متصل بزرگ نگه داشته شده و نویز حذف می‌شود.
+    warped: تصویر خاکستری وارپ‌شده‌ی گرید (CLAHE)
+    warped_original: تصویر خاکستری وارپ‌شده‌ی گرید (اصلی)
+    output_dir: مسیر خروجی
     """
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    cells = [
-        make_raw_cell(warped, row, col)
-        for row in range(9)
-        for col in range(9)
-    ]
-
-    for cell in cells:
-        if not cell.is_empty:
-            cell.image = process_cell(cell.image)
+    # ===== ساخت سلول‌ها از هر دو تصویر =====
+    cells = []
+    for row in range(9):
+        for col in range(9):
+            # برش از تصویر CLAHE
+            crop_clahe = make_raw_cell(warped, row, col)
+            # برش از تصویر اصلی
+            crop_original = make_raw_cell(warped_original, row, col)
+            
+            # اگر سلول خالی نبود، پردازش کن
+            if not crop_clahe.is_empty:
+                # پاس دادن هر دو تصویر به process_cell
+                processed = process_cell(crop_clahe.image, crop_original.image)
+                crop_clahe.image = processed
+            
+            cells.append(crop_clahe)
 
     cells_dir = out_dir / "cells"
     cells_dir.mkdir(exist_ok=True)
@@ -62,7 +63,6 @@ def save_cells(warped, output_dir):
     print(f"grid found; {filled} filled cells, {81 - filled} empty")
 
     return cells
-
 
 def make_raw_cell(warped, row, col) -> Cell:
     """خونه را از تصویر خاکستری خام برش می‌زند و خالی/پر بودنش را با یک چک ساده تشخیص می‌دهد."""
@@ -82,38 +82,66 @@ def make_raw_cell(warped, row, col) -> Cell:
 
     return Cell(crop, is_empty)
 
-def process_cell(crop) -> np.ndarray:
-    # ===== مرحله 1: فیلتر میانه برای حذف نویز نمک و فلفل =====
-    denoised = cv2.medianBlur(crop, 3)  # kernel size 3x3
+def process_cell(crop, crop_original=None, use_original=False) -> np.ndarray:
+    """
+    پردازش سلول با انتخاب خودکار تصویر مناسب بر اساس کنتراست
     
-    # ===== مرحله 2: تشخیص خودکار نوع تصویر و باینری‌سازی هوشمند =====
-    # محاسبه آمار تصویر
-    mean_brightness = np.mean(denoised)
-    contrast = np.std(denoised)
+    پارامترها:
+    - crop: تصویر سلول از warped (CLAHE شده)
+    - crop_original: تصویر سلول از warped_original (عکس اصلی)
+    - use_original: اگر True باشد، همیشه از crop_original استفاده می‌شود
     
-    # تصمیم‌گیری برای انتخاب روش باینری‌سازی
-    if mean_brightness < 30 or contrast < 15:
-        # تصویر خیلی تاریک یا کم‌کنتراست: از آستانه ثابت پایین استفاده کن
-        _, binary = cv2.threshold(denoised, 50, 255, cv2.THRESH_BINARY)
+    منطق:
+    1. ابتدا کنتراست تصویر crop (CLAHE) بررسی می‌شود
+    2. اگر کنتراست پایین بود → از crop_original با Adaptive Thresholding استفاده می‌شود
+    3. اگر کنتراست خوب بود → از crop با OTSU استفاده می‌شود
+    """
+    
+    # ===== مرحله 1: بررسی کنتراست تصویر CLAHE =====
+    contrast = np.std(crop)
+    
+    # ===== مرحله 2: انتخاب تصویر و روش باینری‌سازی =====
+    if contrast < 28 or use_original:
+        # کنتراست پایین است → از تصویر اصلی استفاده کن
+        if crop_original is None:
+            # اگر تصویر اصلی وجود نداشت، از همان crop استفاده کن
+            image_to_use = crop
+        else:
+            image_to_use = crop_original
+        
+        # فیلتر میانه
+        denoised = cv2.medianBlur(image_to_use, 3)
+        
+        # Adaptive Thresholding
+        _, binary = cv2.threshold(
+            denoised,
+            50,  # آستانه ثابت
+            255,
+            cv2.THRESH_BINARY
+        )
     else:
-        # تصویر معمولی: از OTSU استفاده کن
+        # کنتراست خوب است → از تصویر CLAHE استفاده کن
+        # فیلتر میانه
+        denoised = cv2.medianBlur(crop, 3)
+        
+        # OTSU Thresholding
         _, binary = cv2.threshold(
             denoised,
             0,
             255,
-            cv2.THRESH_BINARY | cv2.THRESH_OTSU,
+            cv2.THRESH_BINARY | cv2.THRESH_OTSU
         )
 
+    # ===== مرحله 3: اینورس شرطی =====
     white_ratio = cv2.countNonZero(binary) / binary.size
     if white_ratio > WHITE_RATIO_FOR_INVERSE:
         binary = cv2.bitwise_not(binary)
 
     h, w = binary.shape
 
-    # ماسک خطوطی که باید حذف شوند
+    # ===== مرحله 4: حذف خطوط عمودی لبه =====
     remove_mask = np.zeros_like(binary)
 
-    # پیدا کردن خطوط
     lines = cv2.HoughLinesP(
         binary,
         rho=1,
@@ -133,23 +161,19 @@ def process_cell(crop) -> np.ndarray:
             dx = abs(x2 - x1)
             dy = abs(y2 - y1)
 
-            # فقط خطوط عمودی رو بررسی کن
-            if dx <= 2:  # خط عمودی
+            # فقط خطوط عمودی
+            if dx <= 2:
                 x = (x1 + x2) // 2
                 if x <= margin_x or x >= w - margin_x:
                     cv2.line(remove_mask, (x1, y1), (x2, y2), 255, 3)
-            
-            # خطوط افقی رو کاملاً نادیده بگیر
 
     binary = cv2.bitwise_and(binary, cv2.bitwise_not(remove_mask))
 
-    # پاک‌سازی نویز
+    # ===== مرحله 5: پاک‌سازی نویز =====
     binary = clean_noise(binary)
     
-    # ===== عملیات مورفولوژی =====
+    # ===== مرحله 6: Closing =====
     kernel = np.ones((3, 3), np.uint8)
-    
-    # مرحله 1: Closing (بستن) - برای پر کردن حفره‌های کوچک
     binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
 
     return binary

@@ -16,6 +16,7 @@ class GridNotFoundError(RuntimeError):
     still catches it."""
 
 
+
 def extract(pre, image, output_dir=None):
     """
     pre: a Preprocessed instance from src.preprocess.preprocess()
@@ -79,7 +80,9 @@ def extract(pre, image, output_dir=None):
     matrix = cv2.getPerspectiveTransform(corners, _warp_destination())
     inverse_matrix = np.linalg.inv(matrix)
 
+    # ===== دو ورژن warped =====
     warped = cv2.warpPerspective(pre.normalized, matrix, (WARP_SIZE, WARP_SIZE))
+    warped_original = cv2.warpPerspective(pre.gray, matrix, (WARP_SIZE, WARP_SIZE))
 
     print(f"[grid] method used: {method} ({detector})")
 
@@ -99,8 +102,10 @@ def extract(pre, image, output_dir=None):
         )
         cv2.imwrite(str(out_dir / "05_grid_outline.png"), outline)
         cv2.imwrite(str(out_dir / "06_warped.png"), warped)
+        cv2.imwrite(str(out_dir / "06_warped_original.png"), warped_original)
 
-    return corners, warped, inverse_matrix
+    # ===== برگرداندن ۴ مقدار =====
+    return corners, warped, warped_original, inverse_matrix
 
 
 def _warp_destination() -> np.ndarray:
