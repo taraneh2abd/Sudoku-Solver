@@ -82,14 +82,27 @@ def make_raw_cell(warped, row, col) -> Cell:
 
     return Cell(crop, is_empty)
 
-
 def process_cell(crop) -> np.ndarray:
-    _, binary = cv2.threshold(
-        crop,
-        0,
-        255,
-        cv2.THRESH_BINARY | cv2.THRESH_OTSU,
-    )
+    # ===== مرحله 1: فیلتر میانه برای حذف نویز نمک و فلفل =====
+    denoised = cv2.medianBlur(crop, 3)  # kernel size 3x3
+    
+    # ===== مرحله 2: تشخیص خودکار نوع تصویر و باینری‌سازی هوشمند =====
+    # محاسبه آمار تصویر
+    mean_brightness = np.mean(denoised)
+    contrast = np.std(denoised)
+    
+    # تصمیم‌گیری برای انتخاب روش باینری‌سازی
+    if mean_brightness < 30 or contrast < 15:
+        # تصویر خیلی تاریک یا کم‌کنتراست: از آستانه ثابت پایین استفاده کن
+        _, binary = cv2.threshold(denoised, 50, 255, cv2.THRESH_BINARY)
+    else:
+        # تصویر معمولی: از OTSU استفاده کن
+        _, binary = cv2.threshold(
+            denoised,
+            0,
+            255,
+            cv2.THRESH_BINARY | cv2.THRESH_OTSU,
+        )
 
     white_ratio = cv2.countNonZero(binary) / binary.size
     if white_ratio > WHITE_RATIO_FOR_INVERSE:
@@ -120,20 +133,26 @@ def process_cell(crop) -> np.ndarray:
             dx = abs(x2 - x1)
             dy = abs(y2 - y1)
 
-            if dx <= 2:
+            # فقط خطوط عمودی رو بررسی کن
+            if dx <= 2:  # خط عمودی
                 x = (x1 + x2) // 2
                 if x <= margin_x or x >= w - margin_x:
                     cv2.line(remove_mask, (x1, y1), (x2, y2), 255, 3)
-
-            elif dy <= 2:
-                y = (y1 + y2) // 2
-                if y <= margin_y or y >= h - margin_y:
-                    cv2.line(remove_mask, (x1, y1), (x2, y2), 255, 3)
+            
+            # خطوط افقی رو کاملاً نادیده بگیر
 
     binary = cv2.bitwise_and(binary, cv2.bitwise_not(remove_mask))
 
-    return clean_noise(binary)
+    # پاک‌سازی نویز
+    binary = clean_noise(binary)
+    
+    # ===== عملیات مورفولوژی =====
+    kernel = np.ones((3, 3), np.uint8)
+    
+    # مرحله 1: Closing (بستن) - برای پر کردن حفره‌های کوچک
+    binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
 
+    return binary
 
 def clean_noise(cell_image) -> np.ndarray:
     count, labels, stats, _ = cv2.connectedComponentsWithStats(
