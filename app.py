@@ -23,6 +23,7 @@ os.makedirs("results", exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 
+# @app.route("/")
 @app.route("/")
 def index():
     return render_template("index.html")
